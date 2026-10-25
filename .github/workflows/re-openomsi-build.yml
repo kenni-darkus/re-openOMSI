@@ -1,0 +1,128 @@
+name: "re-openOMSI Windows x64 beta"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/re-openomsi-build.yml'
+      - 'overlay/re-openOMSI-DEV06.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  OPENOMSI_VERSION: '0.3.41-reopen.2'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - name: Checkout our update
+        uses: actions/checkout@v4
+
+      - name: Get pinned openOMSI 0.3.41 source and apply re-openOMSI changes
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v0.3.41 https://github.com/openOMSI-org/openOMSI.git source
+          if ($LASTEXITCODE -ne 0) { throw 'Could not clone upstream source' }
+          $base = (git -C source rev-parse HEAD).Trim()
+          if ($base -ne '33fcc7875a1695f44cbeb209d560e86db3ef4906') {
+            throw "Upstream source changed, refusing to build: $base"
+          }
+          $archive = 'overlay/re-openOMSI-DEV06.zip'
+          if (!(Test-Path $archive)) { throw 'Missing re-openOMSI source overlay' }
+          Expand-Archive -LiteralPath $archive -DestinationPath source -Force
+          foreach ($needed in @('source/crates/omsi-platform/src/updater.rs', 'source/launcher/ui/js/appearance.js', 'source/crates/omsi-navigator/src/city_map.rs')) {
+            if (!(Test-Path $needed)) { throw "Missing patch source: $needed" }
+          }
+          $updater = Get-Content source/crates/omsi-platform/src/updater.rs -Raw
+          if (!$updater.Contains('kenni-darkus/re-openOMSI')) { throw 'Updater still points at upstream releases' }
+          Write-Host "Re-openOMSI overlay applied to pinned upstream $base"
+
+      - name: Rust MSVC tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc,i686-pc-windows-msvc
+
+      - name: Rust build cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            source -> target
+            source/launcher/src-tauri -> target
+
+      - name: Build Windows game and launcher
+        shell: cmd
+        working-directory: source
+        run: scripts\build-windows.cmd x86_64-pc-windows-msvc
+
+      - name: Include official DirectX 11 ANGLE binaries (SHA-256 verified)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force angle | Out-Null
+          gh release download angle-8091-36b74e4dd4 -R openOMSI-org/angle-openomsi --pattern '*-windows-x64.zip' -D angle
+          if ($LASTEXITCODE -ne 0) { throw 'ANGLE download failed' }
+          $zip = Get-ChildItem 'angle/*.zip' | Select-Object -First 1
+          if (!$zip) { throw 'ANGLE archive missing' }
+          $hash = (Get-FileHash $zip.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '1c0086155a17445110dd97400018ca6e72ea245ef178989b457720ee1fba3af5') {
+            throw "Unexpected ANGLE archive hash: $hash"
+          }
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath angle/unpacked -Force
+          foreach ($dll in @('libEGL.dll','libGLESv2.dll')) {
+            $item = Get-ChildItem angle/unpacked -Filter $dll -Recurse -File | Select-Object -First 1
+            if (!$item) { throw "Missing ANGLE DLL: $dll" }
+            Copy-Item $item.FullName source/dist/windows/$dll -Force
+          }
+          $license = Get-ChildItem angle/unpacked -Filter 'LICENSE-ANGLE.txt' -Recurse -File | Select-Object -First 1
+          if ($license) { Copy-Item $license.FullName source/dist/windows/LICENSE-ANGLE.txt -Force }
+
+      - name: Include Windows C++ runtime and project license
+        shell: pwsh
+        run: |
+          Copy-Item source/LICENSE source/dist/windows/LICENSE
+          foreach ($dll in @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll')) {
+            $path = Join-Path $env:WINDIR "System32/$dll"
+            if (!(Test-Path $path)) { throw "Missing VC++ runtime: $path" }
+            Copy-Item $path source/dist/windows/$dll -Force
+          }
+
+      - name: Create verified game update archive
+        shell: pwsh
+        run: |
+          foreach ($exe in @('openomsi.exe','openomsi-launcher.exe','openomsi-launcher-app.exe','omsi-plugin-host32.exe')) {
+            if (!(Test-Path "source/dist/windows/$exe")) { throw "Build missing $exe" }
+          }
+          $zip = "re-openOMSI-$env:OPENOMSI_VERSION-windows-x64.zip"
+          Compress-Archive -Path source/dist/windows/* -DestinationPath $zip -Force
+          if (!(Test-Path $zip)) { throw 'Could not create release zip' }
+          (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content "$zip.sha256"
+          Write-Host "Built $zip"
+
+      - name: Save Windows build for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: re-openOMSI-Windows-x64-${{ env.OPENOMSI_VERSION }}
+          path: |
+            re-openOMSI-${{ env.OPENOMSI_VERSION }}-windows-x64.zip
+            re-openOMSI-${{ env.OPENOMSI_VERSION }}-windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish beta update to GitHub Releases
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "v$env:OPENOMSI_VERSION"
+          $zip = "re-openOMSI-$env:OPENOMSI_VERSION-windows-x64.zip"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; bump the re-open revision before publishing another update" }
+          gh release create $tag $zip "$zip.sha256" --prerelease --title "re-openOMSI $env:OPENOMSI_VERSION (Beta)" --notes "Custom Windows x64 build with launcher themes, GTX 1050 profiles and GPS changes. DirectX 11 remains optional via official ANGLE. TEST version: preserve your current game folder until verified. Based on openOMSI v0.3.41 (AGPL-3.0)." --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish beta release' }
