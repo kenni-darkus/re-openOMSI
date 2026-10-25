@@ -1,25 +1,37 @@
 # re-openOMSI
 
-Własna edycja openOMSI dla Windows x64, rozwijana niezależnie od repozytorium źródłowego. Zachowane są wymagane informacje o oryginalnym projekcie i licencji.
+Nieoficjalna edycja [openOMSI](https://github.com/openOMSI-org/openOMSI) dla Windows x64. Projekt jest oparty na kodzie openOMSI **v0.3.41** (commit `33fcc7875a1695f44cbeb209d560e86db3ef4906`) i udostępniany zgodnie z **AGPL-3.0** (licencja oryginalnych źródeł).
 
-## Stan: DEV05 (przygotowanie importu źródeł)
+## Pobieranie gry
 
-Wersja DEV05 z poprawkami znajduje się w paczce źródłowej przygotowanej w ChatGPT. **To repozytorium na razie nie zawiera pełnego drzewa źródeł, więc NIE da się jeszcze zbudować EXE z GitHub Actions.** Import źródeł jest następnym krokiem. Nie uruchamiaj workflow z niekompletnego projektu.
+**[Releases: Windows x64](https://github.com/kenni-darkus/re-openOMSI/releases)**
 
-### Funkcje przygotowane w kodzie
+Aktualne wydanie testowe: **0.3.41-reopen.2 (Beta)**. Link będzie dostępny dopiero po zakończeniu pomyślnej kompilacji i automatycznej publikacji wydania. Niezakończony lub nieudany build nie jest aktualizacją gry.
 
-- Motyw AMOLED, kolory, tła i pozycjonowanie (źródła, bez testów EXE).
-- Profile grafiki dla GTX 1050.
-- ANGLE/DirectX 11 bez zmian w działającym backendzie.
-- Poprawki GPS i śledzenia gracza w sesji (do testowania po kompilacji).
-- Aktualizator wskazujący wyłącznie `kenni-darkus/re-openOMSI`, obsługujący wersje `0.3.41-reopen.N` oraz kanał beta/stable.
+**[GitHub Actions: postęp kompilacji](https://github.com/kenni-darkus/re-openOMSI/actions/workflows/re-openomsi-build.yml)**
 
-### Wydania i automatyczne aktualizacje
+Pierwsze przejście z oryginalnego openOMSI lub wcześniejszego re-openOMSI wymaga **jednorazowego ręcznego pobrania i uruchomienia nowej paczki Windows**. Dopiero skompilowany launcher z tego projektu ma nowy adres aktualizacji; starego launchera nie da się przeprogramować samym dodaniem wydania na GitHubie.
 
-Docelowy format pliku wydania: `re-openOMSI-0.3.41-reopen.2-windows-x64.zip`. Wersje beta powinny być oznaczane jako GitHub Pre-release. Oryginalne wydania openOMSI nigdy nie powinny być instalowane jako aktualizacje tej edycji.
+1. Zachowaj kopię działającej instalacji i ustawień.
+2. Po pomyślnym buildzie pobierz ZIP z Releases, rozpakuj do osobnego katalogu i uruchom `openomsi.exe`.
+3. W launcherze włącz **Aktualizacje → Kanał beta**, żeby otrzymywać testowe wydania tego projektu.
+4. Jeśli wszystko działa, można korzystać z tego katalogu zamiast poprzedniej instalacji. Nie usuwaj posiadanych map i pojazdów OMSI 2.
 
-**Uwaga:** repo jest prywatne. Aktualizator bez tokenu GitHub nie pobierze prywatnych wydań. Do automatycznych aktualizacji potrzebne są publiczne wydania (np. po upublicznieniu repo albo w oddzielnym publicznym repo dystrybucyjnym). Nie zapisujemy prywatnych tokenów w launcherze.
+## Co zawiera wersja testowa
 
-## Oryginalny projekt
+- Motyw AMOLED, własne kolory i tła w launcherze.
+- Profile graficzne dla laptopa z GTX 1050 (do porównania wydajności).
+- Kod zmian GPS i śledzenia graczy (wymaga testów w grze).
+- Poprawki licznika przystanku.
+- Zachowanie istniejących backendów grafiki; **ANGLE/DirectX 11** dostarczane z oficjalnymi bibliotekami i zweryfikowaną sumą SHA-256.
+- Aktualizator kierowany do **kenni-darkus/re-openOMSI**, a nie do wydań oryginalnego openOMSI.
 
-Źródło: https://github.com/openOMSI-org/openOMSI. Kod pochodny musi zachować licencję i wymagane informacje o autorach. Nie jest to oficjalne wydanie openOMSI.
+Nie gwarantujemy jeszcze poprawności działania funkcji przed testami na Windows.
+
+## Jak działa build
+
+Repozytorium zawiera niewielki zestaw zmian źródłowych w `overlay/re-openOMSI-DEV06.zip`. Workflow `.github/workflows/re-openomsi-build.yml` pobiera przypięte oryginalne źródła openOMSI v0.3.41, nakłada 29 zmodyfikowanych plików, kompiluje program i przy sukcesie publikuje wydanie beta na GitHub Releases. Nie używa niezweryfikowanych kopii bibliotek DX11.
+
+## Autorstwo i licencja
+
+Kod bazowy należy do autorów [openOMSI](https://github.com/openOMSI-org/openOMSI), udostępniony na AGPL-3.0. Zmiany re-openOMSI to osobna, nieoficjalna odmiana. Przy dystrybucji obowiązują warunki AGPL, w tym dostęp do odpowiednich źródeł i informacji o autorach. Samo osobne repozytorium nie zmienia tych obowiązków.
