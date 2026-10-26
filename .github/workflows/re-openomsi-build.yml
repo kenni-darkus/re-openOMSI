@@ -44,7 +44,7 @@ jobs:
           $merged = 0
           $copied = 0
           foreach ($file in (Get-ChildItem $overlay -File -Recurse)) {
-            $relative = $file.FullName.Substring($overlay.Length + 1).Replace('\\','/')
+            $relative = $file.FullName.Substring($overlay.Length + 1).Replace([char]92, '/')
             $destination = Join-Path 'source' $relative
             $parent = Split-Path $destination -Parent
             New-Item -ItemType Directory -Force -Path $parent | Out-Null
