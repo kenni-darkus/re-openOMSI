@@ -67,7 +67,20 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Cannot read original file for merge: $relative" }
             Copy-Item $destination $candidate -Force
             git merge-file --diff3 $candidate $basePath $file.FullName
-            if ($LASTEXITCODE -ne 0) { throw "Merge conflict with openOMSI 0.3.42 in $relative; refusing to release" }
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "::error::Merge conflict in $relative"
+              $lines = @(Get-Content -LiteralPath $candidate)
+              foreach ($i in (0..($lines.Count - 1))) {
+                if ($lines[$i] -match '^<{7}') {
+                  $j = $i
+                  while ($j -lt $lines.Count -and $lines[$j] -notmatch '^>{7}') { $j++ }
+                  $last = [Math]::Min($lines.Count - 1, $j + 3)
+                  $first = [Math]::Max(0, $i - 3)
+                  for ($n = $first; $n -le $last; $n++) { Write-Host ("L{0}: {1}" -f ($n + 1), $lines[$n]) }
+                }
+              }
+              throw "Merge conflict with openOMSI 0.3.42 in $relative; refusing to release"
+            }
             Copy-Item $candidate $destination -Force
             Write-Host "Merged upstream changes and re-openOMSI: $relative"
             $merged++
