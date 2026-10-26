@@ -1,12 +1,12 @@
 # re-openOMSI
 
-Nieoficjalna edycja [openOMSI](https://github.com/openOMSI-org/openOMSI) dla Windows x64. Projekt jest oparty na kodzie openOMSI **v0.3.41** (commit `33fcc7875a1695f44cbeb209d560e86db3ef4906`) i udostępniany zgodnie z **AGPL-3.0** (licencja oryginalnych źródeł).
+Nieoficjalna edycja [openOMSI](https://github.com/openOMSI-org/openOMSI) dla Windows x64. Projekt jest oparty na kodzie openOMSI **v0.3.42** (commit `e624dfbfaec0fac92ee78f9eca57bf845544a503`) i udostępniany zgodnie z **AGPL-3.0** (licencja oryginalnych źródeł).
 
 ## Pobieranie gry
 
 **[Releases: Windows x64](https://github.com/kenni-darkus/re-openOMSI/releases)**
 
-Aktualne wydanie testowe: **0.3.41-reopen.2 (Beta)**. Link będzie dostępny dopiero po zakończeniu pomyślnej kompilacji i automatycznej publikacji wydania. Niezakończony lub nieudany build nie jest aktualizacją gry.
+Wydanie testowe w budowie: **0.3.42-reopen.1 (Beta)**. Link będzie dostępny dopiero po zakończeniu pomyślnej kompilacji i automatycznej publikacji wydania. Niezakończony lub nieudany build nie jest aktualizacją gry.
 
 **[GitHub Actions: postęp kompilacji](https://github.com/kenni-darkus/re-openOMSI/actions/workflows/re-openomsi-build.yml)**
 
@@ -30,7 +30,7 @@ Nie gwarantujemy jeszcze poprawności działania funkcji przed testami na Window
 
 ## Jak działa build
 
-Repozytorium zawiera niewielki zestaw zmian źródłowych w `overlay/re-openOMSI-DEV06.zip`. Workflow `.github/workflows/re-openomsi-build.yml` pobiera przypięte oryginalne źródła openOMSI v0.3.41, nakłada 29 zmodyfikowanych plików, kompiluje program i przy sukcesie publikuje wydanie beta na GitHub Releases. Nie używa niezweryfikowanych kopii bibliotek DX11.
+Repozytorium zawiera niewielki zestaw zmian źródłowych w `overlay/re-openOMSI-DEV07.zip`. Workflow `.github/workflows/re-openomsi-build.yml` pobiera przypięte oryginalne źródła openOMSI v0.3.42, nakłada 29 zmodyfikowanych plików, kompiluje program i przy sukcesie publikuje wydanie beta na GitHub Releases. Nie używa niezweryfikowanych kopii bibliotek DX11.
 
 ## Autorstwo i licencja
 
