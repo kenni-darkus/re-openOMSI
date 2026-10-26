@@ -43,6 +43,7 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath $overlay -Force
           $merged = 0
           $copied = 0
+          $conflicts = @()
           foreach ($file in (Get-ChildItem $overlay -File -Recurse)) {
             $relative = $file.FullName.Substring($overlay.Length + 1).Replace([char]92, '/')
             $destination = Join-Path 'source' $relative
@@ -68,23 +69,40 @@ jobs:
             Copy-Item $destination $candidate -Force
             git merge-file --diff3 $candidate $basePath $file.FullName
             if ($LASTEXITCODE -ne 0) {
-              Write-Host "::error::Merge conflict in $relative"
-              $lines = @(Get-Content -LiteralPath $candidate)
-              foreach ($i in (0..($lines.Count - 1))) {
-                if ($lines[$i] -match '^<{7}') {
-                  $j = $i
-                  while ($j -lt $lines.Count -and $lines[$j] -notmatch '^>{7}') { $j++ }
-                  $last = [Math]::Min($lines.Count - 1, $j + 3)
-                  $first = [Math]::Max(0, $i - 3)
-                  for ($n = $first; $n -le $last; $n++) { Write-Host ("L{0}: {1}" -f ($n + 1), $lines[$n]) }
+              $resolved = $false
+              if ($relative -eq 'launcher/src-tauri/src/commands.rs') {
+                $conflictText = [System.IO.File]::ReadAllText($candidate)
+                $pattern = '(?s)<<<<<<<[^\r\n]*\r?\n.*?\|{7}[^\r\n]*\r?\n.*?=======[^\r\n]*\r?\n.*?>>>>>>>[^\r\n]*\r?\n'
+                $matches = [regex]::Matches($conflictText, $pattern)
+                if ($matches.Count -eq 1 -and $matches[0].Value.Contains('pick_data_folder') -and $matches[0].Value.Contains('reopen_appearance_get')) {
+                  $handler = '    tauri::generate_handler![call, call_bytes, pick_folder, pick_data_folder, pick_file, pick_mod, pick_hofs, open_path, open_url, update_relaunch, selftest_done, fit_zoom, reopen_appearance_get, reopen_appearance_save, reopen_image_save]' + "`n"
+                  $fixed = [regex]::Replace($conflictText, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $handler }, 1)
+                  [System.IO.File]::WriteAllText($candidate, $fixed, [System.Text.UTF8Encoding]::new($false))
+                  $resolved = $true
+                  Write-Host "Resolved known 0.3.42 launcher handler conflict, retaining data-folder and re-openOMSI commands"
                 }
               }
-              throw "Merge conflict with openOMSI 0.3.42 in $relative; refusing to release"
+              if (!$resolved) {
+                Write-Host "::error::Merge conflict in $relative"
+                $lines = @(Get-Content -LiteralPath $candidate)
+                foreach ($i in (0..($lines.Count - 1))) {
+                  if ($lines[$i] -match '^<{7}') {
+                    $j = $i
+                    while ($j -lt $lines.Count -and $lines[$j] -notmatch '^>{7}') { $j++ }
+                    $last = [Math]::Min($lines.Count - 1, [Math]::Min($j + 3, $i + 90))
+                    $first = [Math]::Max(0, $i - 3)
+                    for ($n = $first; $n -le $last; $n++) { Write-Host ("L{0}: {1}" -f ($n + 1), $lines[$n]) }
+                  }
+                }
+                $conflicts += $relative
+                continue
+              }
             }
             Copy-Item $candidate $destination -Force
             Write-Host "Merged upstream changes and re-openOMSI: $relative"
             $merged++
           }
+          if ($conflicts.Count -gt 0) { throw ("Unresolved upstream conflicts, no release: " + ($conflicts -join ', ')) }
           foreach ($needed in @('source/crates/omsi-platform/src/updater.rs', 'source/launcher/ui/js/appearance.js', 'source/crates/omsi-navigator/src/city_map.rs')) {
             if (!(Test-Path $needed)) { throw "Missing patch source: $needed" }
           }
