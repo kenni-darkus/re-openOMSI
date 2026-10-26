@@ -82,6 +82,18 @@ jobs:
                   Write-Host "Resolved known 0.3.42 launcher handler conflict, retaining data-folder and re-openOMSI commands"
                 }
               }
+              if (!$resolved -and $relative -eq 'launcher/ui/js/api.js') {
+                $conflictText = [System.IO.File]::ReadAllText($candidate)
+                $pattern = '(?s)<<<<<<<[^\r\n]*\r?\n.*?\|{7}[^\r\n]*\r?\n.*?=======[^\r\n]*\r?\n.*?>>>>>>>[^\r\n]*\r?\n'
+                $matches = [regex]::Matches($conflictText, $pattern)
+                if ($matches.Count -eq 1 -and $matches[0].Value.Contains('pick_data_folder') -and $matches[0].Value.Contains('reopen_appearance_get')) {
+                  $own = "const OWN = new Set(['reopen_appearance_get', 'reopen_appearance_save', 'reopen_image_save', 'pick_folder', 'pick_data_folder', 'pick_file', 'pick_mod', 'pick_hofs', 'open_path', 'open_url', 'update_relaunch', 'selftest_done', 'fit_zoom']);" + "`n"
+                  $fixed = [regex]::Replace($conflictText, $pattern, [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $own }, 1)
+                  [System.IO.File]::WriteAllText($candidate, $fixed, [System.Text.UTF8Encoding]::new($false))
+                  $resolved = $true
+                  Write-Host "Resolved 0.3.42 JavaScript command registry conflict, keeping all upstream and custom commands"
+                }
+              }
               if (!$resolved) {
                 Write-Host "::error::Merge conflict in $relative"
                 $lines = @(Get-Content -LiteralPath $candidate)
