@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 env:
-  OPENOMSI_VERSION: '0.3.41-reopen.2'
+  OPENOMSI_VERSION: '0.3.42-reopen.1'
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -23,24 +23,61 @@ jobs:
       - name: Checkout our update
         uses: actions/checkout@v4
 
-      - name: Get pinned openOMSI 0.3.41 source and apply re-openOMSI changes
+      - name: Merge re-openOMSI changes onto pinned openOMSI 0.3.42
         shell: pwsh
         run: |
-          git clone --depth 1 --branch v0.3.41 https://github.com/openOMSI-org/openOMSI.git source
-          if ($LASTEXITCODE -ne 0) { throw 'Could not clone upstream source' }
+          $ErrorActionPreference = 'Stop'
+          git clone --depth 1 --branch v0.3.42 https://github.com/openOMSI-org/openOMSI.git source
+          if ($LASTEXITCODE -ne 0) { throw 'Could not clone upstream 0.3.42' }
           $base = (git -C source rev-parse HEAD).Trim()
-          if ($base -ne '33fcc7875a1695f44cbeb209d560e86db3ef4906') {
+          if ($base -ne 'e624dfbfaec0fac92ee78f9eca57bf845544a503') {
             throw "Upstream source changed, refusing to build: $base"
           }
+          git -C source fetch --depth 1 origin 'refs/tags/v0.3.41:refs/tags/v0.3.41'
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch 0.3.41 merge base' }
           $archive = 'overlay/re-openOMSI-DEV06.zip'
           if (!(Test-Path $archive)) { throw 'Missing re-openOMSI source overlay' }
-          Expand-Archive -LiteralPath $archive -DestinationPath source -Force
+          $overlay = Join-Path $env:RUNNER_TEMP 'reopen-overlay'
+          $scratch = Join-Path $env:RUNNER_TEMP 'reopen-merge'
+          New-Item -ItemType Directory -Force -Path $overlay,$scratch | Out-Null
+          Expand-Archive -LiteralPath $archive -DestinationPath $overlay -Force
+          $merged = 0
+          $copied = 0
+          foreach ($file in (Get-ChildItem $overlay -File -Recurse)) {
+            $relative = $file.FullName.Substring($overlay.Length + 1).Replace('\\','/')
+            $destination = Join-Path 'source' $relative
+            $parent = Split-Path $destination -Parent
+            New-Item -ItemType Directory -Force -Path $parent | Out-Null
+            if (!(Test-Path $destination)) {
+              Copy-Item $file.FullName $destination -Force
+              $copied++
+              continue
+            }
+            git -C source diff --quiet v0.3.41 HEAD -- $relative
+            $changed = $LASTEXITCODE
+            if ($changed -eq 0) {
+              Copy-Item $file.FullName $destination -Force
+              $copied++
+              continue
+            }
+            if ($changed -ne 1) { throw "Could not compare upstream history: $relative" }
+            $basePath = Join-Path $scratch 'base.txt'
+            $candidate = Join-Path $scratch 'candidate.txt'
+            git -C source show "v0.3.41:$relative" | Set-Content -LiteralPath $basePath -Encoding utf8NoBOM
+            if ($LASTEXITCODE -ne 0) { throw "Cannot read original file for merge: $relative" }
+            Copy-Item $destination $candidate -Force
+            git merge-file --diff3 $candidate $basePath $file.FullName
+            if ($LASTEXITCODE -ne 0) { throw "Merge conflict with openOMSI 0.3.42 in $relative; refusing to release" }
+            Copy-Item $candidate $destination -Force
+            Write-Host "Merged upstream changes and re-openOMSI: $relative"
+            $merged++
+          }
           foreach ($needed in @('source/crates/omsi-platform/src/updater.rs', 'source/launcher/ui/js/appearance.js', 'source/crates/omsi-navigator/src/city_map.rs')) {
             if (!(Test-Path $needed)) { throw "Missing patch source: $needed" }
           }
           $updater = Get-Content source/crates/omsi-platform/src/updater.rs -Raw
           if (!$updater.Contains('kenni-darkus/re-openOMSI')) { throw 'Updater still points at upstream releases' }
-          Write-Host "Re-openOMSI overlay applied to pinned upstream $base"
+          Write-Host "re-openOMSI overlay: $copied applied, $merged merged cleanly, upstream $base"
 
       - name: Rust MSVC tools
         uses: dtolnay/rust-toolchain@stable
