@@ -27,7 +27,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          git clone --depth 1 --branch v0.3.42 https://github.com/openOMSI-org/openOMSI.git source
+          git -c core.autocrlf=false clone --depth 1 --branch v0.3.42 https://github.com/openOMSI-org/openOMSI.git source
           if ($LASTEXITCODE -ne 0) { throw 'Could not clone upstream 0.3.42' }
           $base = (git -C source rev-parse HEAD).Trim()
           if ($base -ne 'e624dfbfaec0fac92ee78f9eca57bf845544a503') {
@@ -63,7 +63,7 @@ jobs:
             if ($changed -ne 1) { throw "Could not compare upstream history: $relative" }
             $basePath = Join-Path $scratch 'base.txt'
             $candidate = Join-Path $scratch 'candidate.txt'
-            git -C source show "v0.3.41:$relative" | Set-Content -LiteralPath $basePath -Encoding utf8NoBOM
+            git -C source show "v0.3.41:$relative" > $basePath
             if ($LASTEXITCODE -ne 0) { throw "Cannot read original file for merge: $relative" }
             Copy-Item $destination $candidate -Force
             git merge-file --diff3 $candidate $basePath $file.FullName
